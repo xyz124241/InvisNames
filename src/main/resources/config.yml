@@ -1,0 +1,36 @@
+# ============================================================
+#  InvisNames - Konfiguration
+#  Gilt fuer jeden Spieler mit dem Traenke-Effekt "Unsichtbarkeit".
+# ============================================================
+
+# Name ueber dem Kopf (Nametag) verstecken
+nametag:
+  hide: true
+
+# Kill-/Todesnachricht im Chat
+kill-message:
+  enabled: true
+  # Womit der Name des unsichtbaren Killers ersetzt wird (MiniMessage-Format).
+  # Beispiele:
+  #   "-----"                                  -> 5 Bindestriche
+  #   "<obfuscated>XXXXX</obfuscated>"         -> die springenden "Magic"-Zeichen (wie §k)
+  #   "<gray><obfuscated>XXXXXXXX</obfuscated>" -> grau + springend
+  replacement: "-----"
+  # Soll auch der Name versteckt werden, wenn der UNSICHTBARE selbst stirbt?
+  hide-victim-name: false
+
+# Tabliste (TAB-Taste)
+tab:
+  enabled: true
+  # Was in der Tabliste statt des Namens steht (Ping wird vom Spiel selbst angezeigt).
+  # Benutzt PlaceholderAPI-Platzhalter (PlaceholderAPI muss installiert sein) und &-Farbcodes.
+  # %luckperms_prefix%  = Rang (LuckPerms)
+  # %deluxetags_tag%    = aktiver DeluxeTags-Tag
+  format: "%luckperms_prefix%&r %deluxetags_tag%"
+
+# Schwarzer Kopf in der Tabliste (Skin-Textur).
+# Hier muss einmalig ein Textur-Wert eingetragen werden - siehe README.md
+black-skin:
+  enabled: true
+  value: ""
+  signature: ""
