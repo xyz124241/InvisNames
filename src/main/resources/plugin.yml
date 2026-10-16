@@ -3,7 +3,7 @@ version: '${project.version}'
 main: de.invisnames.InvisNames
 api-version: '1.21'
 description: Versteckt Namen von unsichtbaren Spielern (Nametag, Killmessage, Tabliste)
-softdepend: [PlaceholderAPI, LuckPerms, DeluxeTags]
+softdepend: [PlaceholderAPI, LuckPerms, DeluxeTags, TAB]
 commands:
   invisnames:
     description: InvisNames verwalten

@@ -38,7 +38,10 @@ tab:
   enabled: true
   # HIDDEN      = du stehst gar nicht in der Tabliste
   # NAME_HIDDEN = du stehst drin, aber ohne Namen (nur Rang + Tag, schwarzer Kopf)
-  mode: HIDDEN
+  mode: NAME_HIDDEN
+  # Nur bei installiertem Plugin TAB: Text, der statt des Namens im Tab-Eintrag steht.
+  # Leer lassen = Name komplett weg. Rang/Tag bleiben so, wie TAB sie anzeigt.
+  name-replacement: ""
   # Was in der Tabliste statt des Namens steht (Ping wird vom Spiel selbst angezeigt).
   # Benutzt PlaceholderAPI-Platzhalter (PlaceholderAPI muss installiert sein) und &-Farbcodes.
   # %luckperms_prefix%  = Rang (LuckPerms)

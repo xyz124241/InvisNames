@@ -58,6 +58,7 @@ public final class InvisNames extends JavaPlugin implements Listener {
         PlayerProfile oldProfile;
         boolean skinApplied;
         Component lastTab;
+        int tabTick;
         /** Scoreboard -> Name des vorherigen Teams (oder NO_TEAM) */
         final Map<Scoreboard, String> oldTeams = new IdentityHashMap<>();
     }
@@ -208,6 +209,7 @@ public final class InvisNames extends JavaPlugin implements Listener {
         }
         if (getConfig().getBoolean("tab.enabled", true)) {
             for (Player viewer : Bukkit.getOnlinePlayers()) viewer.listPlayer(p);
+            tabPluginSetName(p, null);
             Component old = s.oldListName;
             boolean isDefault = old == null
                     || PlainTextComponentSerializer.plainText().serialize(old).equals(p.getName());
@@ -280,6 +282,40 @@ public final class InvisNames extends JavaPlugin implements Listener {
         if (!c.equals(s.lastTab)) {
             p.playerListName(c);
             s.lastTab = c;
+        }
+        // Falls das Plugin "TAB" laeuft: dort nur den Namensteil leeren
+        // (Rang/Tag aus tabprefix/tabsuffix bleiben). Alle ~5 Sekunden erneut,
+        // weil TAB API-Werte bei Reload/Neuaufbau vergisst.
+        if (s.tabTick++ % 10 == 0) {
+            tabPluginSetName(p, getConfig().getString("tab.name-replacement", ""));
+        }
+    }
+
+    private boolean tabWarned;
+
+    /** Setzt den Namensteil im Tab-Eintrag ueber die API des Plugins TAB (name == null -> zuruecksetzen). */
+    private void tabPluginSetName(Player p, String name) {
+        org.bukkit.plugin.Plugin tab = Bukkit.getPluginManager().getPlugin("TAB");
+        if (tab == null || !tab.isEnabled()) return;
+        try {
+            Class<?> apiClass = Class.forName("me.neznamy.tab.api.TabAPI", true, tab.getClass().getClassLoader());
+            Object api = apiClass.getMethod("getInstance").invoke(null);
+            Object tabPlayer = apiClass.getMethod("getPlayer", UUID.class).invoke(api, p.getUniqueId());
+            if (tabPlayer == null) return;
+            Object mgr = apiClass.getMethod("getTabListFormatManager").invoke(api);
+            if (mgr == null) return;
+            for (Method m : mgr.getClass().getMethods()) {
+                if (m.getName().equals("setName") && m.getParameterCount() == 2) {
+                    m.setAccessible(true);
+                    m.invoke(mgr, tabPlayer, name);
+                    return;
+                }
+            }
+        } catch (Throwable t) {
+            if (!tabWarned) {
+                tabWarned = true;
+                getLogger().warning("TAB-Anbindung fehlgeschlagen: " + t);
+            }
         }
     }
 
