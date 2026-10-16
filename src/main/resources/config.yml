@@ -17,11 +17,28 @@ kill-message:
   #   "<gray><obfuscated>XXXXXXXX</obfuscated>" -> grau + springend
   replacement: "-----"
   # Soll auch der Name versteckt werden, wenn der UNSICHTBARE selbst stirbt?
-  hide-victim-name: false
+  hide-victim-name: true
+
+# Chat-Nachrichten, die der Unsichtbare selbst schreibt
+chat:
+  enabled: true
+  # {message} = deine Nachricht. &-Farbcodes, &k = springende Zeichen.
+  format: "&7----- &8» &f{message}"
+
+# Join-/Quit-Nachricht ("X joined the game") fuer Unsichtbare unterdruecken
+join-quit:
+  hide-messages: true
+
+# Erfolgs-Meldungen ("X has made the advancement ...") fuer Unsichtbare unterdruecken
+advancements:
+  hide-for-invisible: true
 
 # Tabliste (TAB-Taste)
 tab:
   enabled: true
+  # HIDDEN      = du stehst gar nicht in der Tabliste
+  # NAME_HIDDEN = du stehst drin, aber ohne Namen (nur Rang + Tag, schwarzer Kopf)
+  mode: HIDDEN
   # Was in der Tabliste statt des Namens steht (Ping wird vom Spiel selbst angezeigt).
   # Benutzt PlaceholderAPI-Platzhalter (PlaceholderAPI muss installiert sein) und &-Farbcodes.
   # %luckperms_prefix%  = Rang (LuckPerms)

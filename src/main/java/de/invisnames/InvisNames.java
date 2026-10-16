@@ -2,7 +2,10 @@ package de.invisnames;
 
 import com.destroystokyo.paper.profile.PlayerProfile;
 import com.destroystokyo.paper.profile.ProfileProperty;
+import io.papermc.paper.chat.ChatRenderer;
+import io.papermc.paper.event.player.AsyncChatEvent;
 import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.TextReplacementConfig;
 import net.kyori.adventure.text.TranslatableComponent;
 import net.kyori.adventure.text.TranslationArgument;
 import net.kyori.adventure.text.event.HoverEvent;
@@ -19,6 +22,7 @@ import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.entity.EntityPotionEffectEvent;
 import org.bukkit.event.entity.PlayerDeathEvent;
+import org.bukkit.event.player.PlayerAdvancementDoneEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -35,6 +39,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Versteckt den Namen von unsichtbaren Spielern:
@@ -57,7 +62,7 @@ public final class InvisNames extends JavaPlugin implements Listener {
         final Map<Scoreboard, String> oldTeams = new IdentityHashMap<>();
     }
 
-    private final Map<UUID, State> active = new HashMap<>();
+    private final Map<UUID, State> active = new ConcurrentHashMap<>();
     private Method papiSetPlaceholders;
 
     // ------------------------------------------------------------------ Lifecycle
@@ -159,6 +164,7 @@ public final class InvisNames extends JavaPlugin implements Listener {
     @EventHandler
     public void onJoin(PlayerJoinEvent e) {
         Player p = e.getPlayer();
+        if (getConfig().getBoolean("join-quit.hide-messages", true) && isInvis(p)) e.joinMessage(null);
         Bukkit.getScheduler().runTask(this, () -> {
             if (p.isOnline()) check(p);
         });
@@ -166,7 +172,12 @@ public final class InvisNames extends JavaPlugin implements Listener {
 
     @EventHandler
     public void onQuit(PlayerQuitEvent e) {
-        deactivate(e.getPlayer(), false);
+        Player p = e.getPlayer();
+        if (getConfig().getBoolean("join-quit.hide-messages", true)
+                && (active.containsKey(p.getUniqueId()) || isInvis(p))) {
+            e.quitMessage(null);
+        }
+        deactivate(p, false);
     }
 
     // ------------------------------------------------------------------ An / Aus
@@ -196,6 +207,7 @@ public final class InvisNames extends JavaPlugin implements Listener {
             }
         }
         if (getConfig().getBoolean("tab.enabled", true)) {
+            for (Player viewer : Bukkit.getOnlinePlayers()) viewer.listPlayer(p);
             Component old = s.oldListName;
             boolean isDefault = old == null
                     || PlainTextComponentSerializer.plainText().serialize(old).equals(p.getName());
@@ -205,7 +217,18 @@ public final class InvisNames extends JavaPlugin implements Listener {
 
     private void refresh(Player p, State s) {
         if (getConfig().getBoolean("nametag.hide", true)) ensureHiddenNametag(p, s);
-        if (getConfig().getBoolean("tab.enabled", true)) updateTab(p, s);
+        if (getConfig().getBoolean("tab.enabled", true)) {
+            if (tabHidden()) {
+                for (Player viewer : Bukkit.getOnlinePlayers()) viewer.unlistPlayer(p);
+            } else {
+                updateTab(p, s);
+            }
+        }
+    }
+
+    /** true = Spieler steht gar nicht in der Tabliste, sonst nur ohne Namen */
+    private boolean tabHidden() {
+        return "HIDDEN".equalsIgnoreCase(getConfig().getString("tab.mode", "HIDDEN"));
     }
 
     // ------------------------------------------------------------------ Nametag (Scoreboard-Team)
@@ -262,14 +285,7 @@ public final class InvisNames extends JavaPlugin implements Listener {
 
     private Component buildTab(Player p) {
         String fmt = getConfig().getString("tab.format", "%luckperms_prefix%&r %deluxetags_tag%");
-        if (papiSetPlaceholders != null) {
-            try {
-                fmt = (String) papiSetPlaceholders.invoke(null, p, fmt);
-            } catch (Throwable ignored) {
-                // Platzhalter bleiben dann unaufgeloest stehen
-            }
-        }
-        fmt = fmt.replace('§', '&');
+        fmt = papi(p, fmt).replace('§', '&');
         Component c = LegacyComponentSerializer.builder().character('&').hexColors().build().deserialize(fmt);
         if (PlainTextComponentSerializer.plainText().serialize(c).isBlank()) {
             return Component.text(" ");
@@ -277,7 +293,17 @@ public final class InvisNames extends JavaPlugin implements Listener {
         return c;
     }
 
+    private String papi(Player p, String text) {
+        if (papiSetPlaceholders == null) return text;
+        try {
+            return (String) papiSetPlaceholders.invoke(null, p, text);
+        } catch (Throwable ignored) {
+            return text; // Platzhalter bleiben dann unaufgeloest stehen
+        }
+    }
+
     private void applySkin(Player p, State s) {
+        if (tabHidden() || !getConfig().getBoolean("tab.enabled", true)) return;
         if (!getConfig().getBoolean("black-skin.enabled", true)) return;
         String value = getConfig().getString("black-skin.value", "");
         if (value.isBlank()) return;
@@ -290,6 +316,34 @@ public final class InvisNames extends JavaPlugin implements Listener {
             s.skinApplied = true;
         } catch (Throwable t) {
             getLogger().warning("Schwarzer Tab-Kopf konnte nicht gesetzt werden: " + t.getMessage());
+        }
+    }
+
+    // ------------------------------------------------------------------ Chat
+
+    @EventHandler(priority = EventPriority.HIGHEST)
+    public void onChat(AsyncChatEvent e) {
+        if (!getConfig().getBoolean("chat.enabled", true)) return;
+        Player p = e.getPlayer();
+        if (!active.containsKey(p.getUniqueId())) return;
+
+        String fmt = getConfig().getString("chat.format", "&7----- &8» &f{message}");
+        fmt = papi(p, fmt).replace('§', '&');
+        Component base = LegacyComponentSerializer.builder().character('&').hexColors().build().deserialize(fmt);
+        e.renderer(ChatRenderer.viewerUnaware((source, sourceDisplayName, message) ->
+                base.replaceText(TextReplacementConfig.builder()
+                        .matchLiteral("{message}")
+                        .replacement(message)
+                        .build())));
+    }
+
+    // ------------------------------------------------------------------ Advancements
+
+    @EventHandler(priority = EventPriority.HIGHEST)
+    public void onAdvancement(PlayerAdvancementDoneEvent e) {
+        if (getConfig().getBoolean("advancements.hide-for-invisible", true)
+                && (active.containsKey(e.getPlayer().getUniqueId()) || isInvis(e.getPlayer()))) {
+            e.message(null);
         }
     }
 
